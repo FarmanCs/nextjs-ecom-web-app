@@ -2,7 +2,6 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
-import { jwt } from "jsonwebtoken";
 import { User } from "@/app/models/User";
 
 const handler = NextAuth({
@@ -12,34 +11,60 @@ const handler = NextAuth({
       name: "Credentials",
       id: "credentials",
       credentials: {
-        username: {
-          label: "email",
+        email: {
+          label: "Email",
           type: "email",
           placeholder: "test@gmail.com",
         },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials, req) {
-        console.log(credentials);
         const email = credentials?.email;
         const password = credentials?.password;
 
-        mongoose.connect(process.env.MONGO_URL);
+        await mongoose.connect(process.env.MONGO_URL);
         const user = await User.findOne({ email });
-        const passwordOk = user && bcrypt.compareSync(password, user.password);
-        const token = jwt.sign({ id: user._id }, "asdfg", {
-          expiresIn: 60 * 5,
-        });
-        console.log("JWT TOKEN DATA : ", token);
-        console.log({ passwordOk });
-        if (passwordOk) {
-          return user;
+
+        if (!user) {
+          return null;
         }
-        // Return null if user data could not be retrieved
+
+        const passwordOk = bcrypt.compareSync(password, user.password);
+
+        if (passwordOk) {
+          return {
+            id: user._id.toString(),
+            email: user.email,
+          };
+        }
+
         return null;
       },
     }),
   ],
+
+  session: {
+    strategy: "jwt",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id;
+        session.user.email = token.email;
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: "/login",
+  },
 });
 
 export { handler as GET, handler as POST };
