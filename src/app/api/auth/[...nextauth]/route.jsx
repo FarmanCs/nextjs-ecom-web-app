@@ -18,7 +18,7 @@ const handler = NextAuth({
         },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials, req) {
+      async authorize(credentials) {
         const email = credentials?.email;
         const password = credentials?.password;
 
@@ -28,16 +28,13 @@ const handler = NextAuth({
         if (!user) {
           return null;
         }
-
         const passwordOk = bcrypt.compareSync(password, user.password);
-
         if (passwordOk) {
           return {
             id: user._id.toString(),
-            email: user.email,
+            user,
           };
         }
-
         return null;
       },
     }),
